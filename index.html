@@ -3,185 +3,126 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nebula AI - Cinematic Entrance</title>
-  <style>
-    html, body { width: 100%; height: 100%; }
-    body { margin: 0; background: #020005; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; touch-action: none; }
-    canvas { display: block; }
+  <title>Nag Kaon Kana Love?</title>
 
-    /* Main UI Container (Permission + Loading only) */
-    #ui-wrapper {
-      position: absolute; inset: 0;
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      z-index: 1000; text-align: center;
-      background: radial-gradient(circle, #1a001a 0%, #020005 100%);
-      transition: opacity 1s ease-in-out;
-    }
+  <link rel="stylesheet" href="./style.css" />
 
-    /* Permission Screen */
-    #permission-screen { max-width: 520px; padding: 20px; }
-    h1 { font-weight: 300; letter-spacing: 12px; color: #fff; text-shadow: 0 0 20px #ff007f; margin-bottom: 18px; }
-    .sweet-msg { color: #ffb6c1; font-size: 1.1rem; line-height: 1.65; margin-bottom: 34px; }
+  <!-- Icons: Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
-    /* Loading Screen (keep yours) */
-    #loading-screen { display: none; }
-    .loader-ring {
-      width: 80px; height: 80px; border: 3px solid rgba(255, 0, 127, 0.1);
-      border-top: 3px solid #ff007f; border-radius: 50%;
-      animation: spin 1s linear infinite; margin: 0 auto 30px;
-      box-shadow: 0 0 20px rgba(255, 0, 127, 0.2);
+  <!-- Import map for Three.js -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
     }
-    #load-status { font-family: 'Courier New', Courier, monospace; color: #ff007f; font-size: 0.9rem; letter-spacing: 2px; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-    button {
-      background: #ff007f; border: none; color: #fff; padding: 20px 50px;
-      cursor: pointer; border-radius: 50px; font-size: 1rem; transition: 0.4s; font-weight: bold;
-      letter-spacing: 3px; text-transform: uppercase; box-shadow: 0 0 20px rgba(255,0,127,0.4);
-    }
-    button:hover { background: #fff; color: #ff007f; transform: scale(1.05); box-shadow: 0 0 40px #ff007f; }
-
-    /* Cinematic Entrance Overlay (shows AFTER loading, BEFORE particles) */
-    #cinematic {
-      position: fixed; inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 900;
-      background: radial-gradient(circle, rgba(26,0,26,0.95) 0%, rgba(2,0,5,0.98) 65%, rgba(2,0,5,1) 100%);
-      opacity: 0;
-      transition: opacity 1.2s ease;
-      pointer-events: none;
-    }
-    #cinematic.show { opacity: 1; }
-    #cinematic .inner {
-      width: min(900px, 92vw);
-      text-align: left;
-      padding: 28px;
-      filter: drop-shadow(0 0 18px rgba(255,0,127,0.18));
-    }
-    #cinematic .title {
-      font-weight: 260;
-      text-transform: uppercase;
-      letter-spacing: clamp(12px, 2.6vw, 28px);
-      font-size: clamp(54px, 7vw, 96px);
-      line-height: 1.15;
-      color: rgba(255,255,255,0.96);
-      text-shadow:
-        0 0 28px rgba(255, 0, 127, 0.22),
-        0 0 70px rgba(180, 80, 255, 0.10);
-    }
-
-    /* Center toast */
-    #center-toast{
-      position: absolute; left: 50%; top: 50%;
-      transform: translate(-50%, -50%) scale(0.98);
-      padding: 16px 22px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.14);
-      background: rgba(2,0,5,0.45);
-      backdrop-filter: blur(10px);
-      color: rgba(255,255,255,0.96);
-      text-transform: uppercase;
-      letter-spacing: 8px;
-      font-weight: 600;
-      font-size: clamp(16px, 2.2vw, 24px);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .45s ease, transform .45s ease;
-      text-shadow: 0 0 18px rgba(255,0,127,0.22);
-      z-index: 450;
-      max-width: 92vw;
-      text-align: center;
-      line-height: 1.3;
-      white-space: normal;
-    }
-    #center-toast.show{
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1.02);
-    }
-
-    /* Bottom hint */
-    #gesture-hint {
-      position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
-      text-align: center; color: #fff; font-size: clamp(1.05rem, 2.2vw, 1.6rem);
-      text-transform: uppercase;
-      letter-spacing: 4px; text-shadow: 0 0 20px #ff007f; pointer-events: none;
-      font-weight: bold; width: 100%;
-      opacity: 0; transition: opacity 1s;
-      padding: 0 16px;
-      max-width: 92vw;
-      line-height: 1.2;
-    }
-
-    /* GIF reveal (pinch) */
-    #cute-gif {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%) scale(0.86);
-      width: min(360px, 78vw);
-      border-radius: 30px;
-      border: 2px solid rgba(255,255,255,0.8);
-      opacity: 0;
-      filter: blur(10px) saturate(1.15);
-      display: none;
-      visibility: hidden;
-      z-index: 500;
-      box-shadow: 0 0 90px rgba(255, 0, 127, 0.35);
-      transition: opacity .55s ease, transform .85s ease, filter .85s ease;
-      will-change: opacity, transform, filter;
-    }
-    #cute-gif.show {
-      opacity: 1;
-      filter: blur(0px) saturate(1.05);
-      transform: translate(-50%, -50%) scale(1);
-      visibility: visible;
-    }
-
-    #charge-bar-container {
-      position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
-      width: min(240px, 70vw); height: 4px;
-      background: rgba(255, 255, 255, 0.1); border-radius: 2px; display: none;
-      z-index: 400;
-    }
-    #charge-bar { width: 0%; height: 100%; background: #fff; box-shadow: 0 0 15px #fff; }
-
-    @media (max-width: 480px) {
-      h1 { letter-spacing: 10px; }
-      .sweet-msg { font-size: 1rem; }
-      button { padding: 16px 34px; font-size: .95rem; letter-spacing: 2px; }
-      #center-toast { letter-spacing: 5px; padding: 14px 16px; border-radius: 20px; }
-      #gesture-hint { bottom: 44px; letter-spacing: 3px; }
-      #charge-bar-container { bottom: 92px; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      #cinematic, #ui-wrapper, #gesture-hint, #center-toast, #cute-gif { transition: none !important; }
-      .loader-ring { animation: none !important; }
-    }
-  </style>
+  </script>
 </head>
-<body>
 
+<body>
   <div id="ui-wrapper">
     <div id="permission-screen">
+
+      <!-- Quick intro tips shown before the camera permission UI -->
+      <div class="pre-msg" aria-label="Experience tip">
+        <div class="pre-line">
+          <i class="fa-solid fa-lightbulb pre-ico" aria-hidden="true"></i>
+          <span>TURN YOUR LIGHTS ON</span>
+        </div>
+        <div class="pre-line sub">
+          <i class="fa-solid fa-volume-high pre-ico" aria-hidden="true"></i>
+          <span>MAX YOUR VOLUME FOR BETTER EXPERIENCE</span>
+        </div>
+      </div>
+
       <h1>HELLO BEAUTIFUL</h1>
+
+      <!-- Permission explanation (shown before starting the experience) -->
       <p class="sweet-msg">
-        Welcome to your personal cosmic space. ✨ <br />
+        Welcome to your personal cosmic space.
+        <i class="fa-solid fa-stars" aria-hidden="true"></i>
+        <br />
         To interact with the stars and transform the nebula using your hands, we need access to your camera.
         Don't worry, your privacy is safe, everything stays right here in your browser.
       </p>
-      <button id="start-btn">ALLOW CAMERA & BEGIN</button>
+
+      <!-- Start: triggers camera permission + app boot -->
+      <button id="start-btn">
+        <i class="fa-solid fa-camera" aria-hidden="true"></i>
+        ALLOW CAMERA &amp; BEGIN
+      </button>
     </div>
 
+    <!-- Loading states while initializing MediaPipe + Three.js -->
     <div id="loading-screen">
       <div class="loader-ring"></div>
       <div id="load-status">INITIALIZING SYSTEM...</div>
     </div>
   </div>
 
+  <!-- Fullscreen intro overlay before showing the HUD -->
   <div id="cinematic">
     <div class="inner">
       <div class="title">WELCOME TO<br />NEBULA</div>
+    </div>
+  </div>
+
+  <!-- Tutorial rail: shows the gesture flow -->
+  <div id="tutorial-panel" aria-hidden="true">
+    <div class="t-title">
+      <i class="fa-solid fa-route" aria-hidden="true"></i>
+      FLOW
+    </div>
+    <ul id="step-list"></ul>
+  </div>
+
+  <!-- Camera picture-in-picture -->
+  <div id="camera-pip" aria-hidden="true">
+    <div class="pip-label">
+      <i class="fa-solid fa-video" aria-hidden="true"></i>
+      CAM
+    </div>
+    <video id="self-video" autoplay playsinline muted></video>
+  </div>
+
+  <!-- Step badge: will also act as the "Steps" toggle on mobile -->
+  <div
+    id="step-badge"
+    role="button"
+    tabindex="0"
+    aria-controls="tutorial-panel"
+    aria-expanded="false"
+    aria-label="Show steps"
+  >
+    STEP 1/5
+  </div>
+
+  <!-- Valentine modal -->
+  <div id="valentine-modal" aria-hidden="false">
+    <div class="card">
+      <div class="title">
+        <i class="fa-solid fa-heart" aria-hidden="true"></i>
+        WILL YOU BE MY VALENTINE?
+      </div>
+
+      <div class="sub" id="modal-sub">
+        <i class="fa-solid fa-face-smile" aria-hidden="true"></i>
+        Be honest... but not too honest
+      </div>
+
+      <div class="actions">
+        <button id="yes-btn">
+          <i class="fa-solid fa-heart" aria-hidden="true"></i>
+          YES
+        </button>
+        <button id="no-btn" type="button">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          NO
+        </button>
+      </div>
+
+      <div id="no-counter"></div>
     </div>
   </div>
 
@@ -191,720 +132,16 @@
   <div id="charge-bar-container"><div id="charge-bar"></div></div>
   <div id="gesture-hint">Waiting for Hands</div>
 
-  <!-- Background audio (must be a direct .mp3/.ogg you have rights to use) -->
+  <!-- Background audio -->
   <audio id="nebula-audio" preload="auto" loop></audio>
+  <!-- Audio used for the “peace” / valentine moment -->
+  <audio id="sweet-audio" preload="auto"></audio>
 
-  <script type="importmap">
-    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-  </script>
-
-  <script type="module">
-    import * as THREE from 'three';
-
-    const PARTICLE_COUNT = 85000;
-    const TEXT_SCALE = 0.16;
-
-    const ROT_SENS = 1.6;
-    const ROT_CLAMP = 0.85;
-    const ROT_SMOOTH = 0.08;
-
-    // hand-distance zoom
-    const PALM_MIN = 0.12;
-    const PALM_MAX = 0.30;
-    const PROX_SMOOTH = 0.14;
-
-    // base presets (desktop-ish); mobile tuning is applied via getters below
-    const CAM = { idle: 38, heart: 40, text: 46 };
-    const ZR  = { idle: 4.0, heart: 5.0, text: 5.5 };
-    const CAM_CLAMP = {
-      idle: [34, 44],
-      heart: [34, 46],
-      text: [40, 56]
-    };
-
-    // pinch gifs (exactly 4)
-    const PINCH_GIFS = [
-      "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExdDg1dXJqdDJsdDRnY3JzNzh1Mmd0N3QxdTRjejB5emx4eDI4ZzY4eiZlcD12MV9pbnRlcm5hbF9naWY_by_id&ct=g&cid=790b7611t85urjt2slt4g3rs78u2mgt7q1t4zj5zlx2z8gz8z/KztT2c4u8mYYUiMKdJ/giphy.gif",
-      "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExbTFkaGE4Nmtzdzl5NzY0a3ByNmIxcjBza3B4cWVraWNjdmlmZGh0bCZlcD12MV9pbnRlcm5hbF9naWY_by_id&ct=g&cid=790b7611m1dha86ksw9y764kpr6m1r0skpxqekiccvifdhtb/SILTTnZ7qHX2Y6Oqtm/giphy.gif",
-      "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExYTRxdXFtajdoaHc2dWc5OG9ua3lmOTIxcmkybndiNHhqeTBxcmJ0NiZlcD12MV9pbnRlcm5hbF9naWY_by_id&ct=g&cid=790b7611a4quqmj7hhw6uwg98onkyf921ri2wnb4xqyt0rbt6/wPnbkEcr2tXiTN0Lmq/giphy.gif",
-      "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExcXcyNTI0djl0emg3ZjZpOWV1amZpcnNmbHk3d3c4MnF3c244bnk3ZyZlcD12MV9pbnRlcm5hbF9naWY_by_id&ct=g&cid=790b7611qw2524v9tzh7f6i9uejzirsfly7ww82wqso48ny7g/1JmGiBtqTuehfYxuy9/giphy.gif"
-    ];
-
-    // audio (replace with your hosted audio file path/url)
-    const AUDIO_SRC = "assets/nebula_ambience.mp3"; // <- put your licensed file here
-    const audioEl = document.getElementById("nebula-audio");
-    audioEl.src = AUDIO_SRC;
-    audioEl.volume = 0.0;
-
-    // text responsiveness tuning
-    let textScale = TEXT_SCALE;
-    let textFontPx = 65;
-
-    let scene, camera, renderer, points, material, geometry;
-    let targetMorph = 0, currentMorph = 0;
-    let baseCamZ = CAM.idle, targetCamZ = CAM.idle;
-    let mode = "idle";
-
-    let targetRotX = 0, targetRotY = 0;
-    let handPresent = false;
-    let prox01 = 0.5;
-
-    let lastGesture = "none", gestureStartTime = 0, lastExecutedGesture = "none";
-    const STABILITY_MS = 1000;
-
-    // allow proximity zoom on ALL gestures EXCEPT pinch
-    let allowProxZoom = true;
-
-    // pinch state
-    let pinchActive = false;
-    let beforePinchMode = "idle";
-
-    // pinch animation state: "one particle becomes the image"
-    let pinchBurstActive = false;
-    let pinchBurstStart = 0;
-    const PINCH_BURST_MS = 520;
-
-    // lock camera z during pinch so it NEVER zooms
-    let pinchLockZ = CAM.idle;
-
-    // pinch burst targets (for smooth particle container morph)
-    let pinchSeedX = 0, pinchSeedY = 0;
-    let pinchRingPts = null;
-
-    const zJitter = new Float32Array(PARTICLE_COUNT);
-    for (let i = 0; i < PARTICLE_COUNT; i++) zJitter[i] = (Math.random() - 0.5) * 1.0;
-
-    const uiWrapper = document.getElementById('ui-wrapper');
-    const permScreen = document.getElementById('permission-screen');
-    const loadScreen = document.getElementById('loading-screen');
-    const loadStatus = document.getElementById('load-status');
-    const gestureHint = document.getElementById('gesture-hint');
-    const cinematic = document.getElementById('cinematic');
-    const toast = document.getElementById('center-toast');
-    const gif = document.getElementById('cute-gif');
-
-    const updateLoadStatus = (msg) => loadStatus.innerText = msg.toUpperCase();
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-
-    const isMobileLike = () => {
-      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-      return coarse || Math.min(window.innerWidth, window.innerHeight) < 700;
-    };
-
-    function updateTextTuning() {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const s = clamp(Math.min(w / 900, h / 700), 0.55, 1.0);
-      textScale = TEXT_SCALE * s;
-      textFontPx = Math.round(clamp(65 * s, 44, 65));
-    }
-
-    function getBaseCam(nextMode) {
-      if (isMobileLike()) {
-        if (nextMode === "text") return 58;
-        if (nextMode === "heart") return 48;
-        if (nextMode === "idle") return 42;
-      }
-      return CAM[nextMode] ?? CAM.idle;
-    }
-
-    function getZoomRange(nextMode) {
-      if (isMobileLike()) {
-        if (nextMode === "text") return 3.6;
-        if (nextMode === "heart") return 4.2;
-        if (nextMode === "idle") return 3.0;
-      }
-      return ZR[nextMode] ?? 4.0;
-    }
-
-    function getCamClamp(nextMode) {
-      if (isMobileLike()) {
-        if (nextMode === "text") return [50, 72];
-        if (nextMode === "heart") return [40, 60];
-        if (nextMode === "idle") return [36, 54];
-      }
-      return CAM_CLAMP[nextMode] ?? [34, 56];
-    }
-
-    let toastTimer = null;
-    function showCenterToast(msg, duration = 900) {
-      toast.textContent = msg;
-      toast.classList.add('show');
-      if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
-    }
-
-    function showGifOff() {
-      gif.classList.remove('show');
-      gif.style.visibility = 'hidden';
-      setTimeout(() => { gif.style.display = 'none'; }, 450);
-    }
-
-    function loadGifWithFallback(urlList) {
-      return new Promise((resolve, reject) => {
-        let tries = 0;
-        const used = new Set();
-
-        const attempt = () => {
-          if (tries >= urlList.length) return reject(new Error("All GIFs failed"));
-          tries++;
-
-          // pick random not used yet
-          let pick;
-          do { pick = urlList[Math.floor(Math.random() * urlList.length)]; }
-          while (used.has(pick) && used.size < urlList.length);
-          used.add(pick);
-
-          gif.onload = () => resolve(pick);
-          gif.onerror = () => attempt();
-
-          // hide broken icon while loading
-          gif.style.display = 'block';
-          gif.style.visibility = 'hidden';
-          gif.classList.remove('show');
-
-          gif.src = pick;
-        };
-
-        attempt();
-      });
-    }
-
-    async function showGifOn() {
-      try {
-        await loadGifWithFallback(PINCH_GIFS);
-        // reveal smoothly only after it is actually loaded
-        requestAnimationFrame(() => {
-          gif.style.visibility = 'visible';
-          gif.classList.add('show');
-        });
-      } catch {
-        showGifOff();
-      }
-    }
-
-    function waitForMediaPipe(timeoutMs = 8000) {
-      const start = Date.now();
-      return new Promise((resolve, reject) => {
-        const tick = () => {
-          if (window.Hands && window.Camera) return resolve();
-          if (Date.now() - start > timeoutMs) return reject(new Error("MediaPipe load timeout"));
-          requestAnimationFrame(tick);
-        };
-        tick();
-      });
-    }
-
-    async function playCinematicEntrance() {
-      cinematic.style.display = 'flex';
-      requestAnimationFrame(() => cinematic.classList.add('show'));
-      await sleep(1400);
-
-      cinematic.classList.remove('show');
-      await sleep(1200);
-
-      cinematic.style.display = 'none';
-      if (renderer?.domElement) renderer.domElement.style.opacity = '1';
-      gestureHint.style.opacity = '1';
-
-      // fade in audio after entry (still started on click)
-      fadeAudioTo(0.30, 1600);
-    }
-
-    function primeAudio() {
-      // must happen inside user gesture
-      audioEl.volume = 0.0;
-      const p = audioEl.play();
-      if (p && typeof p.catch === "function") p.catch(() => {});
-    }
-
-    function fadeAudioTo(targetVolume = 0.30, ms = 1200) {
-      const start = performance.now();
-      const from = audioEl.volume;
-      const to = clamp(targetVolume, 0, 1);
-
-      const tick = (now) => {
-        const t = clamp((now - start) / ms, 0, 1);
-        const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
-        audioEl.volume = from + (to - from) * e;
-        if (t < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    }
-
-    document.getElementById('start-btn').onclick = async () => {
-      try {
-        // start audio in the same click gesture (autoplay-safe)
-        primeAudio();
-
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        stream.getTracks().forEach(t => t.stop());
-
-        permScreen.style.display = 'none';
-        loadScreen.style.display = 'block';
-
-        updateLoadStatus("Accessing Camera...");
-        await sleep(800);
-
-        updateLoadStatus("Initializing MediaPipe AI...");
-        await waitForMediaPipe().catch(() => {});
-        await sleep(800);
-
-        updateLoadStatus("Mapping Starfield Coordinates...");
-        initThree();
-        await sleep(900);
-
-        updateLoadStatus("Synchronizing Gesture Library...");
-        startAI();
-        await sleep(900);
-
-        updateLoadStatus("Ready.");
-        await sleep(350);
-
-        uiWrapper.style.opacity = '0';
-        setTimeout(() => uiWrapper.style.display = 'none', 950);
-
-        await playCinematicEntrance();
-      } catch (e) {
-        alert("Camera access is required. Refresh and allow camera to enter Nebula.");
-      }
-    };
-
-    const vertexShader = `
-      uniform float uTime;
-      uniform float uMorph;
-      attribute vec3 targetPos;
-      attribute float aSize;
-      varying vec3 vColor;
-
-      void main() {
-        vec3 pos = mix(position, targetPos, uMorph);
-
-        float driftFactor = mix(1.0, 0.18, uMorph);
-        pos.x += sin(uTime * 0.15 + position.z) * 0.2 * driftFactor;
-        pos.y += cos(uTime * 0.15 + position.x) * 0.2 * driftFactor;
-
-        vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-        float sizeMultiplier = mix(1.0, 1.25, uMorph);
-        gl_PointSize = clamp((aSize * (45.0 * sizeMultiplier)) / -mvPosition.z, 1.0, 72.0);
-        gl_Position = projectionMatrix * mvPosition;
-
-        vec3 colorCore = vec3(1.0, 1.0, 1.0);
-        vec3 colorEdge = vec3(1.0, 0.05, 0.6);
-        float dist = length(pos) / 30.0;
-        vColor = mix(colorCore, colorEdge, clamp(dist + (1.0 - uMorph), 0.0, 1.0));
-      }
-    `;
-
-    const fragmentShader = `
-      varying vec3 vColor;
-      void main() {
-        float d = length(gl_PointCoord - vec2(0.5));
-        if (d > 0.5) discard;
-        gl_FragColor = vec4(vColor, smoothstep(0.5, 0.1, d) * 0.9);
-      }
-    `;
-
-    function getUniverseData() {
-      const pos = new Float32Array(PARTICLE_COUNT * 3);
-      const sizes = new Float32Array(PARTICLE_COUNT);
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const r = Math.pow(Math.random(), 0.5) * 40;
-        const theta = r * 0.2 + (i % 3) * (Math.PI * 0.66);
-        pos[i*3]   = Math.cos(theta) * r + (Math.random()-0.5)*10;
-        pos[i*3+1] = (Math.random()-0.5)*12;
-        pos[i*3+2] = Math.sin(theta) * r + (Math.random()-0.5)*10;
-        sizes[i] = 0.5 + Math.random() * 0.5;
-      }
-      return { pos, sizes };
-    }
-
-    function updateCameraFov() {
-      if (!camera) return;
-      const aspect = window.innerWidth / window.innerHeight;
-      camera.fov = (aspect < 0.9) ? 72 : 60; // portrait = wider view
-      camera.aspect = aspect;
-      camera.updateProjectionMatrix();
-    }
-
-    function initThree() {
-      updateTextTuning();
-
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-      camera.position.z = 100;
-      updateCameraFov();
-
-      const mobile = isMobileLike();
-      renderer = new THREE.WebGLRenderer({ antialias: !mobile, alpha: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.35 : 2));
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-      document.body.appendChild(renderer.domElement);
-
-      renderer.domElement.style.opacity = '0';
-      renderer.domElement.style.transition = 'opacity 1.2s ease';
-
-      geometry = new THREE.BufferGeometry();
-      const universe = getUniverseData();
-      geometry.setAttribute('position', new THREE.BufferAttribute(universe.pos, 3));
-      geometry.setAttribute('targetPos', new THREE.BufferAttribute(new Float32Array(PARTICLE_COUNT * 3), 3));
-      geometry.setAttribute('aSize', new THREE.BufferAttribute(universe.sizes, 1));
-
-      material = new THREE.ShaderMaterial({
-        uniforms: { uTime: { value: 0 }, uMorph: { value: 0 } },
-        vertexShader, fragmentShader,
-        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
-      });
-
-      points = new THREE.Points(geometry, material);
-      scene.add(points);
-
-      animate();
-    }
-
-    function applyHandZoom() {
-      if (!allowProxZoom) return;
-
-      const t = (0.5 - prox01) * 2.0; // far -> zoom out, near -> zoom in
-      const zr = getZoomRange(mode);
-      const base = baseCamZ;
-      const [minZ, maxZ] = getCamClamp(mode);
-
-      targetCamZ = clamp(base + (t * zr), minZ, maxZ);
-    }
-
-    function animate() {
-      requestAnimationFrame(animate);
-
-      const time = performance.now() * 0.001;
-      material.uniforms.uTime.value = time;
-
-      currentMorph += (targetMorph - currentMorph) * 0.045;
-      material.uniforms.uMorph.value = currentMorph;
-
-      // Pinch burst = particle-only morph (NO camera zoom ever)
-      if (pinchBurstActive && pinchRingPts) {
-        const t = clamp((performance.now() - pinchBurstStart) / PINCH_BURST_MS, 0, 1);
-        const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
-
-        // hard lock camera during pinch
-        targetCamZ = pinchLockZ;
-
-        // morph seed -> ring container
-        const targetAttr = geometry.attributes.targetPos.array;
-
-        for (let i = 0; i < PARTICLE_COUNT; i++) {
-          const i3 = i * 3;
-          const pt = pinchRingPts[i % pinchRingPts.length];
-
-          const sx = pinchSeedX + (Math.sin(i * 12.9898) * 0.18);
-          const sy = pinchSeedY + (Math.cos(i * 78.233) * 0.18);
-
-          targetAttr[i3]     = sx + (pt.x - sx) * e;
-          targetAttr[i3 + 1] = sy + (pt.y - sy) * e;
-          targetAttr[i3 + 2] = zJitter[i] * 0.9;
-        }
-        geometry.attributes.targetPos.needsUpdate = true;
-
-        if (t >= 1) {
-          pinchBurstActive = false;
-          setTarget(pinchRingPts); // lock final container
-        }
-      } else {
-        if (pinchActive) targetCamZ = pinchLockZ;  // still no zoom
-        else applyHandZoom();
-      }
-
-      camera.position.z += (targetCamZ - camera.position.z) * 0.04;
-
-      if (!handPresent) {
-        targetRotY += 0.0018;
-        targetRotX = Math.sin(time * 0.4) * 0.1;
-      }
-
-      if (points) {
-        points.rotation.x += (targetRotX - points.rotation.x) * ROT_SMOOTH;
-        points.rotation.y += (targetRotY - points.rotation.y) * ROT_SMOOTH;
-      }
-
-      renderer?.render(scene, camera);
-    }
-
-    function getHeartPoints() {
-      const arr = new Float32Array(PARTICLE_COUNT * 3);
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const t = Math.random() * Math.PI * 2;
-        const x = 16 * Math.pow(Math.sin(t), 3);
-        const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-        arr[i*3] = x * 1.1; arr[i*3+1] = y * 1.1; arr[i*3+2] = (Math.random()-0.5)*5;
-      }
-      return arr;
-    }
-
-    const tCanvas = document.createElement('canvas');
-    const tCtx = tCanvas.getContext('2d');
-    tCanvas.width = 1200; tCanvas.height = 400;
-
-    function getTextPoints(text) {
-      updateTextTuning();
-
-      tCtx.clearRect(0, 0, 1200, 400);
-      tCtx.fillStyle = 'white';
-      tCtx.font = `bold ${textFontPx}px Arial`;
-      tCtx.textAlign = 'center';
-      tCtx.textBaseline = 'middle';
-
-      if (text.length > 20) {
-        tCtx.fillText("CAN U BE MY", 600, 160);
-        tCtx.fillText("VALENTINE DATE?", 600, 240);
-      } else {
-        tCtx.fillText(text, 600, 200);
-      }
-
-      const data = tCtx.getImageData(0, 0, 1200, 400).data;
-      const pts = [];
-      for (let y = 0; y < 400; y += 4) {
-        for (let x = 0; x < 1200; x += 4) {
-          if (data[(y * 1200 + x) * 4] > 128) {
-            pts.push({ x: (x - 600) * textScale, y: (200 - y) * textScale });
-          }
-        }
-      }
-      return pts;
-    }
-
-    function setTarget(dataPoints) {
-      const targetAttr = geometry.attributes.targetPos.array;
-      const isArr = Array.isArray(dataPoints);
-
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const i3 = i * 3;
-        if (!isArr) {
-          targetAttr[i3] = dataPoints[i3];
-          targetAttr[i3+1] = dataPoints[i3+1];
-          targetAttr[i3+2] = dataPoints[i3+2];
-        } else {
-          const pt = dataPoints[i % dataPoints.length];
-          targetAttr[i3] = pt.x;
-          targetAttr[i3+1] = pt.y;
-          targetAttr[i3+2] = zJitter[i];
-        }
-      }
-      geometry.attributes.targetPos.needsUpdate = true;
-      targetMorph = 1.0;
-    }
-
-    function setMode(next) {
-      mode = next;
-      baseCamZ = getBaseCam(next);
-    }
-
-    function updateProximityFromHand(marks) {
-      const palm = Math.hypot(marks[5].x - marks[17].x, marks[5].y - marks[17].y);
-      const raw = clamp((palm - PALM_MIN) / (PALM_MAX - PALM_MIN), 0, 1);
-      prox01 += (raw - prox01) * PROX_SMOOTH;
-    }
-
-    // Pinch effect: "one particle blooms" into a centered particle container
-    function runPinchBurst() {
-      const pos = geometry.attributes.position.array;
-      const idx = Math.floor(Math.random() * PARTICLE_COUNT);
-
-      pinchSeedX = pos[idx*3];
-      pinchSeedY = pos[idx*3+1];
-
-      const pts = [];
-      const ringCount = 2600;
-      const radius = isMobileLike() ? 12.6 : 14.2;
-      const thick = isMobileLike() ? 2.0 : 2.4;
-
-      for (let i = 0; i < ringCount; i++) {
-        const a = (i / ringCount) * Math.PI * 2;
-        const r = radius + (Math.random() - 0.5) * thick;
-        pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
-      }
-      pinchRingPts = pts;
-
-      const seedPts = [];
-      for (let i = 0; i < 1800; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const r = Math.random() * 0.28;
-        seedPts.push({ x: pinchSeedX + Math.cos(a) * r, y: pinchSeedY + Math.sin(a) * r });
-      }
-      setTarget(seedPts);
-
-      pinchBurstActive = true;
-      pinchBurstStart = performance.now();
-    }
-
-    async function startAI() {
-      const video = document.createElement('video');
-      video.setAttribute('playsinline', 'true');
-      video.muted = true;
-
-      const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-      hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.8 });
-
-      hands.onResults(results => {
-        const barCont = document.getElementById('charge-bar-container');
-        const bar = document.getElementById('charge-bar');
-
-        const hasHands = results.multiHandLandmarks && results.multiHandLandmarks.length > 0;
-        handPresent = hasHands;
-
-        let current = "none";
-
-        if (hasHands) {
-          const marks = results.multiHandLandmarks[0];
-
-          updateProximityFromHand(marks);
-
-          // rotation from wrist
-          targetRotY = clamp(-(marks[0].x - 0.5) * ROT_SENS, -ROT_CLAMP, ROT_CLAMP);
-          targetRotX = clamp((marks[0].y - 0.5) * ROT_SENS, -ROT_CLAMP, ROT_CLAMP);
-
-          // finger states
-          const indexUp  = marks[8].y  < marks[6].y;
-          const middleUp = marks[12].y < marks[10].y;
-          const ringUp   = marks[16].y < marks[14].y;
-          const pinkyUp  = marks[20].y < marks[18].y;
-
-          // pinch
-          const pinch = Math.hypot(marks[4].x - marks[8].x, marks[4].y - marks[8].y) < 0.035;
-
-          // new mapping (less confusing):
-          // pinch -> picture
-          // peace -> valentine
-          // open palm -> heart
-          // closed palm -> iloveyou
-          // middle finger -> bitch
-          const openPalm = indexUp && middleUp && ringUp && pinkyUp;
-          const closedPalm = !indexUp && !middleUp && !ringUp && !pinkyUp;
-          const peace = indexUp && middleUp && !ringUp && !pinkyUp;
-          const middleFinger = middleUp && !indexUp && !ringUp && !pinkyUp;
-
-          if (pinch) current = "pinch";
-          else if (peace) current = "valentine";
-          else if (middleFinger) current = "bitch";
-          else if (openPalm) current = "heart";
-          else if (closedPalm) current = "love";
-          else current = "none";
-        } else {
-          prox01 += (0.5 - prox01) * 0.06;
-        }
-
-        // Pinch: IMAGE + PARTICLE CONTAINER ONLY (NO ZOOM EVER)
-        if (current === "pinch") {
-          if (!pinchActive) {
-            pinchActive = true;
-            beforePinchMode = mode;
-
-            // lock camera z instantly so there's zero zoom movement
-            pinchLockZ = camera?.position?.z ?? targetCamZ;
-            targetCamZ = pinchLockZ;
-
-            allowProxZoom = false;
-
-            // clean UI while pinch is active
-            toast.classList.remove('show');
-            barCont.style.display = 'none';
-            bar.style.width = '0%';
-
-            runPinchBurst();
-            showGifOn();     // safe load (no broken icon)
-
-            gestureHint.innerText = " ";
-          }
-          return;
-        } else if (pinchActive) {
-          pinchActive = false;
-          allowProxZoom = true;
-
-          showGifOff();
-
-          pinchRingPts = null;
-          pinchBurstActive = false;
-
-          setMode(beforePinchMode || "idle");
-          gestureHint.innerText = "Waiting for Hands";
-        }
-
-        // stability
-        if (current === lastGesture && current !== "none") {
-          const progress = Math.min(((Date.now() - gestureStartTime) / STABILITY_MS) * 100, 100);
-
-          if (progress < 100) {
-            barCont.style.display = 'block';
-            bar.style.width = progress + '%';
-            gestureHint.innerText = "HOLDING...";
-          } else {
-            barCont.style.display = 'none';
-            if (lastExecutedGesture !== current) {
-              execute(current);
-              lastExecutedGesture = current;
-            }
-          }
-        } else {
-          lastGesture = current;
-          lastExecutedGesture = "none";
-          gestureStartTime = Date.now();
-          barCont.style.display = 'none';
-
-          if (current === "none") {
-            setMode("idle");
-            targetMorph = 0.0;
-            gestureHint.innerText = "Universe Idle";
-          }
-        }
-      });
-
-      const cam = new Camera(video, {
-        onFrame: async () => { await hands.send({ image: video }); },
-        width: 640, height: 480
-      });
-      cam.start();
-    }
-
-    function execute(g) {
-      if (g === "valentine") {
-        setMode("text");
-        gestureHint.innerText = " ";
-        showCenterToast("💗 VALENTINE? 💗", 900);
-        setTarget(getTextPoints("CAN U BE MY VALENTINE DATE?"));
-      }
-      else if (g === "heart") {
-        setMode("heart");
-        gestureHint.innerText = " ";
-        showCenterToast("Forming Heart...", 700);
-        setTarget(getHeartPoints());
-      }
-      else if (g === "love") {
-        setMode("text");
-        gestureHint.innerText = " ";
-        showCenterToast("I LOVE YOUUU", 900);
-        setTarget(getTextPoints("I LOVE YOUUU"));
-      }
-      else if (g === "bitch") {
-        setMode("text");
-        gestureHint.innerText = " ";
-        showCenterToast("BITCH", 900);
-        setTarget(getTextPoints("BITCH"));
-      }
-    }
-
-    window.addEventListener('resize', () => {
-      if (!camera || !renderer) return;
-      updateTextTuning();
-      updateCameraFov();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobileLike() ? 1.35 : 2));
-    });
-  </script>
-
+  <!-- MediaPipe (globals: Hands, Camera) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+  <!-- App entry -->
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
