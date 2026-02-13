@@ -286,7 +286,6 @@ button:hover {
   opacity: 0;
   transition: opacity 1s;
 
-  /* Needs to be clickable for the mobile “Steps” toggle */
   pointer-events: auto;
   cursor: pointer;
   user-select: none;
@@ -357,10 +356,8 @@ button:hover {
   opacity: 0;
   transition: opacity 1s ease;
 
-  /* Default: HUD-only; expanded state will enable interaction */
   pointer-events: none;
 
-  /* Keeps expanded lists from taking over the whole screen */
   max-height: min(72vh, 520px);
   overflow: hidden;
 }
@@ -505,7 +502,7 @@ button:hover {
 }
 
 /* Tablet + mobile tuning */
-@media (max-width: 820px) {
+@media (max-width: 820px), (pointer: coarse) {
   h1 { letter-spacing: clamp(6px, 1.6vw, 10px); }
   .sweet-msg { font-size: clamp(0.98rem, 2.6vw, 1.05rem); }
   button { padding: clamp(14px, 2.2vw, 16px) clamp(24px, 6vw, 34px); font-size: clamp(.92rem, 2.4vw, .98rem); letter-spacing: clamp(2px, 0.8vw, 2px); }
@@ -513,12 +510,40 @@ button:hover {
   #gesture-hint { bottom: calc(clamp(40px, 5vh, 52px) + env(safe-area-inset-bottom, 0px)); letter-spacing: clamp(2px, 0.8vw, 3px); }
   #charge-bar-container { bottom: calc(clamp(84px, 8vh, 96px) + env(safe-area-inset-bottom, 0px)); }
   #step-badge { bottom: calc(clamp(110px, 10vh, 132px) + env(safe-area-inset-bottom, 0px)); letter-spacing: clamp(3px, 1vw, 4px); }
-  #camera-pip { top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); width: min(240px, 44vw); border-radius: 16px; }
 
-  /* Compact tutorial mode:
-     - default: show only the active step so the animation stays visible
-     - expanded (aria-hidden="false"): show the full list */
-  #tutorial-panel { top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px)); width: min(300px, 60vw); border-radius: 16px; }
+  /* Camera: tall IG-style + capped so it won’t swallow the screen */
+  #camera-pip {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    width: clamp(112px, 30vw, 150px);
+    max-width: 150px;
+    aspect-ratio: 9 / 16;
+    max-height: min(46vh, 360px);
+    border-radius: 14px;
+  }
+  #camera-pip .pip-label{
+    top: 8px;
+    left: 8px;
+    padding: 5px 8px;
+    font-size: 0.68rem;
+    letter-spacing: 3px;
+  }
+
+  /* Tutorial: reserve space for camera so they never overlap */
+  #tutorial-panel {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    width: min(260px, calc(100vw - 24px - 150px - 10px));
+    border-radius: 16px;
+    max-height: min(40vh, 220px);
+  }
+  #tutorial-panel .t-title{
+    margin-bottom: 8px;
+  }
+  #step-list{
+    gap: 8px;
+  }
+
   .step-item { display: none; }
   .step-item.active { display: flex; }
   #tutorial-panel[aria-hidden="false"] .step-item { display: flex; }
@@ -526,6 +551,31 @@ button:hover {
   /* Keep the pre-message readable on smaller screens */
   .pre-msg{ font-size: clamp(0.84rem, 2.2vw, 0.9rem); letter-spacing: clamp(1px, 0.6vw, 2px); }
   .pre-msg .pre-line{ gap: clamp(8px, 2vw, 10px); }
+}
+
+@media (max-width: 480px), (pointer: coarse) and (max-height: 760px) {
+  /* Stronger mobile clamp so the HUD never eats the stage */
+  #camera-pip {
+    width: clamp(104px, 32vw, 136px);
+    max-width: 136px;
+    max-height: min(44vh, 320px);
+    border-radius: 14px;
+  }
+  #tutorial-panel {
+    width: min(230px, calc(100vw - 24px - 136px - 10px));
+    max-height: min(34vh, 190px);
+  }
+  .step-item{
+    padding: 9px 9px;
+    border-radius: 12px;
+  }
+  .step-text .label{
+    font-size: 0.74rem;
+    letter-spacing: 2px;
+  }
+  .step-text .sub{
+    font-size: 0.74rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

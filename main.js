@@ -1,6 +1,22 @@
 import * as THREE from "three";
 
-const PARTICLE_COUNT = 85000;
+/*
+  Low-end optimization notes (no feature changes, just cost control):
+  - Adaptive particle count on mobile/low-spec devices
+  - Lower pixel ratio on mobile to reduce fill-rate
+  - Cap render FPS on mobile (keeps thermals down)
+  - MediaPipe: lower resolution + run inference every other frame on mobile
+  - Pinch burst: remove per-particle sin/cos inside the hot loop
+*/
+
+const PARTICLE_COUNT =
+  ((window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+    Math.min(window.innerWidth, window.innerHeight) < 700 ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
+    (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4))
+    ? 38000
+    : 85000;
+
 const TEXT_SCALE = 0.16;
 
 const ROT_SENS = 1.6;
@@ -42,7 +58,7 @@ sweetAudioEl.volume = 0.0;
 let textScale = TEXT_SCALE;
 let textFontPx = 65;
 
-let scene, camera, renderer, points, material, geometry;
+let scene, camera, renderer, points, material, geometry, lastRenderMs = 0, mpFrame = 0;
 let targetMorph = 0,
   currentMorph = 0;
 let baseCamZ = CAM.idle,
@@ -350,7 +366,10 @@ noBtn.addEventListener("click", dodgeNo);
 // Responsive helpers (mobile-like = coarse pointer or small viewport)
 const isMobileLike = () => {
   const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
-  return coarse || Math.min(window.innerWidth, window.innerHeight) < 700;
+  const small = Math.min(window.innerWidth, window.innerHeight) < 700;
+  const lowMem = navigator.deviceMemory && navigator.deviceMemory <= 4;
+  const lowCpu = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
+  return coarse || small || lowMem || lowCpu;
 };
 
 function updateTextTuning() {
@@ -581,7 +600,7 @@ const vertexShader = `
 
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     float sizeMultiplier = mix(1.0, 1.25, uMorph);
-    gl_PointSize = clamp((aSize * (45.0 * sizeMultiplier)) / -mvPosition.z, 1.0, 72.0);
+    gl_PointSize = clamp((aSize * (45.0 * sizeMultiplier)) / -mvPosition.z, 1.0, 56.0);
     gl_Position = projectionMatrix * mvPosition;
 
     vec3 colorCore = vec3(1.0, 1.0, 1.0);
@@ -634,7 +653,7 @@ function initThree() {
   const mobile = isMobileLike();
   renderer = new THREE.WebGLRenderer({ antialias: !mobile, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.35 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.0 : 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   document.body.appendChild(renderer.domElement);
@@ -672,10 +691,15 @@ function applyHandZoom() {
   targetCamZ = clamp(base + t * zr, minZ, maxZ);
 }
 
-function animate() {
+function animate(now) {
   requestAnimationFrame(animate);
 
-  const time = performance.now() * 0.001;
+  now = now || performance.now();
+  const frameMin = isMobileLike() ? 1000 / 45 : 0;
+  if (frameMin && now - lastRenderMs < frameMin) return;
+  lastRenderMs = now;
+
+  const time = now * 0.001;
   material.uniforms.uTime.value = time;
 
   currentMorph += (targetMorph - currentMorph) * 0.045;
@@ -688,13 +712,18 @@ function animate() {
     targetCamZ = pinchLockZ;
 
     const targetAttr = geometry.attributes.targetPos.array;
+    const ringLen = pinchRingPts.length;
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
-      const pt = pinchRingPts[i % pinchRingPts.length];
+      const pt = pinchRingPts[i % ringLen];
 
-      const sx = pinchSeedX + Math.sin(i * 12.9898) * 0.18;
-      const sy = pinchSeedY + Math.cos(i * 78.233) * 0.18;
+      // Use precomputed jitter instead of per-particle sin/cos (hot path)
+      const j1 = zJitter[i] * 0.18;
+      const j2 = zJitter[(i * 13) % PARTICLE_COUNT] * 0.18;
+
+      const sx = pinchSeedX + j1;
+      const sy = pinchSeedY + j2;
 
       targetAttr[i3] = sx + (pt.x - sx) * e;
       targetAttr[i3 + 1] = sy + (pt.y - sy) * e;
@@ -814,7 +843,7 @@ function runPinchBurst() {
   pinchSeedY = pos[idx * 3 + 1];
 
   const pts = [];
-  const ringCount = 2600;
+  const ringCount = isMobileLike() ? 1600 : 2600;
   const radius = isMobileLike() ? 12.6 : 14.2;
   const thick = isMobileLike() ? 2.0 : 2.4;
 
@@ -826,7 +855,8 @@ function runPinchBurst() {
   pinchRingPts = pts;
 
   const seedPts = [];
-  for (let i = 0; i < 1800; i++) {
+  const seedCount = isMobileLike() ? 900 : 1800;
+  for (let i = 0; i < seedCount; i++) {
     const a = Math.random() * Math.PI * 2;
     const r = Math.random() * 0.28;
     seedPts.push({ x: pinchSeedX + Math.cos(a) * r, y: pinchSeedY + Math.sin(a) * r });
@@ -852,7 +882,7 @@ async function startAI() {
 
   hands.setOptions({
     maxNumHands: 1,
-    modelComplexity: 1,
+    modelComplexity: isMobileLike() ? 0 : 1,
     minDetectionConfidence: 0.8,
     minTrackingConfidence: 0.75,
   });
@@ -985,10 +1015,14 @@ async function startAI() {
 
   const cam = new CameraCtor(video, {
     onFrame: async () => {
+      if (isMobileLike()) {
+        mpFrame = (mpFrame + 1) & 1;
+        if (mpFrame) return;
+      }
       await hands.send({ image: video });
     },
-    width: 640,
-    height: 480,
+    width: isMobileLike() ? 480 : 640,
+    height: isMobileLike() ? 360 : 480,
   });
   cam.start();
 }
@@ -1041,5 +1075,5 @@ window.addEventListener("resize", () => {
   updateCameraFov();
   syncTutorialPanelLayout();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobileLike() ? 1.35 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobileLike() ? 1.0 : 2));
 });
