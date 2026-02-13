@@ -22,7 +22,7 @@
     h1 { font-weight: 300; letter-spacing: 12px; color: #fff; text-shadow: 0 0 20px #ff007f; margin-bottom: 18px; }
     .sweet-msg { color: #ffb6c1; font-size: 1.1rem; line-height: 1.65; margin-bottom: 34px; }
 
-    /* Loading Screen (keep yours) */
+    /* Loading Screen */
     #loading-screen { display: none; }
     .loader-ring {
       width: 80px; height: 80px; border: 3px solid rgba(255, 0, 127, 0.1);
@@ -40,7 +40,7 @@
     }
     button:hover { background: #fff; color: #ff007f; transform: scale(1.05); box-shadow: 0 0 40px #ff007f; }
 
-    /* Cinematic Entrance Overlay (shows AFTER loading, BEFORE particles) */
+    /* Cinematic Entrance Overlay */
     #cinematic {
       position: fixed; inset: 0;
       display: none;
@@ -113,7 +113,7 @@
       line-height: 1.2;
     }
 
-    /* GIF reveal: smooth “inside the nebula” transition */
+    /* GIF reveal (pinch) */
     #cute-gif {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%) scale(0.86);
@@ -142,12 +142,27 @@
     }
     #charge-bar { width: 0%; height: 100%; background: #fff; box-shadow: 0 0 15px #fff; }
 
+    /* hidden youtube audio holder */
+    #yt-audio {
+      position: fixed;
+      width: 1px; height: 1px;
+      left: -2000px; top: -2000px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+      #charge-bar-container { bottom: 96px; }
+      #gesture-hint { bottom: 48px; }
+    }
+
     @media (max-width: 480px) {
       h1 { letter-spacing: 10px; }
       .sweet-msg { font-size: 1rem; }
       button { padding: 16px 34px; font-size: .95rem; letter-spacing: 2px; }
       #center-toast { letter-spacing: 5px; padding: 14px 16px; border-radius: 20px; }
       #gesture-hint { bottom: 44px; letter-spacing: 3px; }
+      #cute-gif { width: min(320px, 84vw); border-radius: 24px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -158,7 +173,6 @@
 </head>
 <body>
 
-  <!-- UI (Permission + Loading) -->
   <div id="ui-wrapper">
     <div id="permission-screen">
       <h1>HELLO BEAUTIFUL</h1>
@@ -176,18 +190,19 @@
     </div>
   </div>
 
-  <!-- Cinematic entrance -->
   <div id="cinematic">
     <div class="inner">
       <div class="title">WELCOME TO<br />NEBULA</div>
     </div>
   </div>
 
-  <img id="cute-gif" alt="pinch gif" />
+  <img id="cute-gif" alt="" />
   <div id="center-toast"></div>
 
   <div id="charge-bar-container"><div id="charge-bar"></div></div>
   <div id="gesture-hint">Waiting for Hands</div>
+
+  <div id="yt-audio"></div>
 
   <script type="importmap">
     { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
@@ -196,68 +211,155 @@
   <script type="module">
     import * as THREE from 'three';
 
-    // --- Configuration ---
+    // --- device perf (mobile/tablet optimization) ---
+    const IS_MOBILE =
+      matchMedia("(max-width: 768px)").matches ||
+      /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
+
     const PARTICLE_COUNT = 85000;
     const TEXT_SCALE = 0.16;
 
-    // rotation
     const ROT_SENS = 1.6;
     const ROT_CLAMP = 0.85;
     const ROT_SMOOTH = 0.08;
 
-    // ✅ hand-distance zoom (best practice: smooth + clamp)
-    const PALM_MIN = 0.12;    // far hand
-    const PALM_MAX = 0.30;    // near hand
+    // hand-distance zoom
+    const PALM_MIN = 0.12;
+    const PALM_MAX = 0.30;
     const PROX_SMOOTH = 0.14;
 
-    // base camera per mode + zoom range
-    const CAM = {
-      idle: 38,
-      heart: 40,
-      text: 46,
-      pinch: 44
-    };
-    const ZR = {
-      idle: 4.0,
-      heart: 5.0,
-      text: 5.5,
-      pinch: 5.0
-    };
+    const CAM = { idle: 38, heart: 40, text: 46 };
+    const ZR  = { idle: 4.0, heart: 5.0, text: 5.5 };
     const CAM_CLAMP = {
       idle: [34, 44],
       heart: [34, 46],
-      text: [40, 56],   // prevent text overflow
-      pinch: [36, 54]
+      text: [40, 56]
     };
 
-    // pinch gifs
+    // pinch gifs (4 only)
     const PINCH_GIFS = [
-      "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExdDg1dXJqdDJsdDRnY3JzNzh1Mmd0N3QxdTRjejB5emx4eDI4ZzY4eiZlcD12MV9pbnRlcm5hbF9naWY-by-id&c=q&cid=790b7611t85urjt2slt4g3rs78u2mgt7q1t4zj5zlx2z8gz8z/ KztT2c4u8mYYUiMKdJ/giphy.gif".replace(" ", ""),
-      "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExbTFkaGE4Nmtzdzl5NzY0a3ByNmIxcjBza3B4cWVraWNjdmlmZGh0bCZlcD12MV9pbnRlcm5hbF9naWY-by-id&c=q&cid=790b7611m1dha86ksw9y764kpr6m1r0skpxqekiccvifdhtb/ SILTTnZ7qHX2Y6Oqtm/giphy.gif".replace(" ", ""),
-      "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExYTRxdXFtajdoaHc2dWc5OG9ua3lmOTIxcmkybndiNHhqeTBxcmJ0NiZlcD12MV9pbnRlcm5hbF9naWY-by-id&c=q&cid=790b7611a4quqmj7hhw6uwg98onk yf921ri2wnb4xqyt0rbt6/wPnbkEcr2tXiTN0Lmq/giphy.gif".replace(" ", ""),
-      "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExcXcyNTI0djl0emg3ZjZpOWV1amZpcnNmbHk3d3c4MnF3c244bnk3ZyZlcD12MV9pbnRlcm5hbF9naWY-by-id&c=q&cid=790b7611qw2524v9tzh7f6i9uejzirsfly7ww82wqso48ny7g/1JmGiBtqTuehfYxuy9/giphy.gif"
+      "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExdDg1dXJqdDJsdDRnY3JzNzh1Mmd0N3QxdTRjejB5emx4eDI4ZzY4eiZlcD12MV9pbnRlcm5hbF9naWY_by_id&ct=g&cid=790b7611t85urjt2slt4g3rs78u2mgt7q1t4zj5zlx2z8gz8z/KztT2c4u8mYYUiMKdJ/giphy.gif",
+      "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExbTFkaGE4Nmtzdzl5NzY0a3ByNmIxcjBza3B4cWVraWNjdmlmZGh0bCZlcD12MV9pbnRlcm5hbF9naWY_by_id&ct=g&cid=790b7611m1dha86ksw9y764kpr6m1r0skpxqekiccvifdhtb/SILTTnZ7qHX2Y6Oqtm/giphy.gif",
+      "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExYTRxdXFtajdoaHc2dWc5OG9ua3lmOTIxcmkybndiNHhqeTBxcmJ0NiZlcD12MV9pbnRlcm5hbF9naWY_by_id&ct=g&cid=790b7611a4quqmj7hhw6uwg98onkyf921ri2wnb4xqyt0rbt6/wPnbkEcr2tXiTN0Lmq/giphy.gif",
+      "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExcXcyNTI0djl0emg3ZjZpOWV1amZpcnNmbHk3d3c4MnF3c244bnk3ZyZlcD12MV9pbnRlcm5hbF9naWY_by_id&ct=g&cid=790b7611qw2524v9tzh7f6i9uejzirsfly7ww82wqso48ny7g/1JmGiBtqTuehfYxuy9/giphy.gif"
     ];
 
-    // state
+    // YouTube sound (enter nebula)
+    const YT_VIDEO_ID = "kMzCAYf5o8Q";
+    let ytPlayer = null;
+    let ytPrimeRequested = false;
+    let ytUnmuteRequested = false;
+    let ytFailed = false;
+
+    function loadYouTubeAPIOnce() {
+      if (window.YT && window.YT.Player) return Promise.resolve();
+      if (window.__ytLoading) return window.__ytLoading;
+
+      window.__ytLoading = new Promise((resolve) => {
+        window.onYouTubeIframeAPIReady = () => resolve();
+        const s = document.createElement("script");
+        s.src = "https://www.youtube.com/iframe_api";
+        s.async = true;
+        s.onerror = () => { ytFailed = true; resolve(); };
+        document.head.appendChild(s);
+      });
+
+      return window.__ytLoading;
+    }
+
+    function initYouTubePlayer() {
+      if (ytFailed || ytPlayer || !(window.YT && window.YT.Player)) return;
+
+      ytPlayer = new window.YT.Player("yt-audio", {
+        height: "1",
+        width: "1",
+        videoId: YT_VIDEO_ID,
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          iv_load_policy: 3,
+          modestbranding: 1,
+          playsinline: 1,
+          rel: 0
+        },
+        events: {
+          onReady: (e) => {
+            try {
+              e.target.setVolume(70);
+              e.target.mute();
+
+              if (ytPrimeRequested) e.target.playVideo();
+              if (ytUnmuteRequested) {
+                e.target.unMute();
+                e.target.playVideo();
+              }
+            } catch {}
+          },
+          onError: () => { ytFailed = true; }
+        }
+      });
+    }
+
+    // Start muted playback as early as possible (helps autoplay rules)
+    function primeNebulaSoundMuted() {
+      ytPrimeRequested = true;
+      try {
+        if (ytPlayer) {
+          ytPlayer.mute();
+          ytPlayer.playVideo();
+        }
+      } catch {}
+    }
+
+    // Unmute when "enter nebula" happens
+    function playNebulaSound() {
+      ytUnmuteRequested = true;
+      try {
+        if (ytPlayer) {
+          ytPlayer.unMute();
+          ytPlayer.setVolume(70);
+          ytPlayer.playVideo();
+        }
+      } catch {}
+    }
+
+    // --- 3D state ---
     let scene, camera, renderer, points, material, geometry;
     let targetMorph = 0, currentMorph = 0;
     let baseCamZ = CAM.idle, targetCamZ = CAM.idle;
     let mode = "idle";
 
-    // rotation targets
     let targetRotX = 0, targetRotY = 0;
     let handPresent = false;
 
-    // hand proximity
-    let prox01 = 0.5; // 0 far, 1 near (smoothed)
+    let prox01 = 0.5;
 
-    // stability
     let lastGesture = "none", gestureStartTime = 0, lastExecutedGesture = "none";
     const STABILITY_MS = 1000;
+
+    // allow proximity zoom on all gestures EXCEPT pinch
+    let allowProxZoom = true;
 
     // pinch state
     let pinchActive = false;
     let beforePinchMode = "idle";
+
+    // pinch morph animation state (particle-only)
+    let pinchBurstActive = false;
+    let pinchBurstStart = 0;
+    const PINCH_BURST_MS = 420;
+
+    // lock camera z during pinch so it NEVER zooms
+    let pinchLockZ = CAM.idle;
+
+    // pinch burst targets (for smooth particle container morph)
+    let pinchSeedX = 0, pinchSeedY = 0;
+    let pinchRingPts = null;
+
+    // async gif load token (prevents late loads showing after pinch ended)
+    let pinchGifToken = 0;
 
     const zJitter = new Float32Array(PARTICLE_COUNT);
     for (let i = 0; i < PARTICLE_COUNT; i++) zJitter[i] = (Math.random() - 0.5) * 1.0;
@@ -274,8 +376,7 @@
 
     const updateLoadStatus = (msg) => loadStatus.innerText = msg.toUpperCase();
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
     let toastTimer = null;
     function showCenterToast(msg, duration = 900) {
@@ -285,14 +386,27 @@
       toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
     }
 
-    function showGif(on) {
-      if (on) {
-        gif.style.display = 'block';
-        requestAnimationFrame(() => gif.classList.add('show'));
-      } else {
-        gif.classList.remove('show');
-        setTimeout(() => { gif.style.display = 'none'; }, 450);
-      }
+    // pinch image: never show broken placeholder
+    function hideGif() {
+      gif.classList.remove('show');
+      gif.style.display = 'none';
+      gif.removeAttribute('src');
+    }
+
+    function loadGifWithFallback(urls, maxTries = 4) {
+      return new Promise((resolve, reject) => {
+        let tries = 0;
+        const tryNext = () => {
+          if (tries >= Math.min(maxTries, urls.length)) return reject(new Error("All GIFs failed"));
+          const url = urls[tries++];
+          const probe = new Image();
+          probe.onload = () => resolve(probe.src);
+          probe.onerror = () => tryNext();
+          const bust = (url.includes("?") ? "&" : "?") + "v=" + Date.now();
+          probe.src = url + bust;
+        };
+        tryNext();
+      });
     }
 
     function waitForMediaPipe(timeoutMs = 8000) {
@@ -307,7 +421,6 @@
       });
     }
 
-    // cinematic entrance
     async function playCinematicEntrance() {
       cinematic.style.display = 'flex';
       requestAnimationFrame(() => cinematic.classList.add('show'));
@@ -323,6 +436,10 @@
 
     document.getElementById('start-btn').onclick = async () => {
       try {
+        // Prime YouTube sound ASAP (best chance to satisfy autoplay rules)
+        loadYouTubeAPIOnce().then(() => { initYouTubePlayer(); primeNebulaSoundMuted(); }).catch(() => {});
+        primeNebulaSoundMuted();
+
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         stream.getTracks().forEach(t => t.stop());
 
@@ -350,6 +467,9 @@
         uiWrapper.style.opacity = '0';
         setTimeout(() => uiWrapper.style.display = 'none', 950);
 
+        // "enter to nebula" sound
+        playNebulaSound();
+
         await playCinematicEntrance();
 
       } catch (e) {
@@ -357,7 +477,7 @@
       }
     };
 
-    // --- Shader & 3D ---
+    // --- Shader ---
     const vertexShader = `
       uniform float uTime;
       uniform float uMorph;
@@ -368,7 +488,6 @@
       void main() {
         vec3 pos = mix(position, targetPos, uMorph);
 
-        // reduced drift in text mode
         float driftFactor = mix(1.0, 0.18, uMorph);
         pos.x += sin(uTime * 0.15 + position.z) * 0.2 * driftFactor;
         pos.y += cos(uTime * 0.15 + position.x) * 0.2 * driftFactor;
@@ -413,9 +532,15 @@
       camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
       camera.position.z = 100;
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer = new THREE.WebGLRenderer({
+        antialias: !IS_MOBILE,
+        alpha: true,
+        powerPreference: "high-performance"
+      });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+      const pr = IS_MOBILE ? 1.25 : 2;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pr));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
 
       document.body.appendChild(renderer.domElement);
@@ -441,11 +566,11 @@
     }
 
     function applyHandZoom() {
-      // map prox01 into [-1..1] so far zooms out, near zooms in
+      if (!allowProxZoom) return;
+
       const t = (0.5 - prox01) * 2.0;
       const zr = ZR[mode] ?? 4.0;
       const base = baseCamZ;
-
       const minZ = CAM_CLAMP[mode]?.[0] ?? 34;
       const maxZ = CAM_CLAMP[mode]?.[1] ?? 56;
 
@@ -461,10 +586,39 @@
       currentMorph += (targetMorph - currentMorph) * 0.045;
       material.uniforms.uMorph.value = currentMorph;
 
-      applyHandZoom();
-      camera.position.z += (targetCamZ - camera.position.z) * 0.04;
+      // Pinch: lock camera, particle morph only
+      if (pinchActive) {
+        targetCamZ = pinchLockZ;
+        camera.position.z = pinchLockZ;
 
-      // rotation: hand controlled if present, otherwise idle
+        if (pinchBurstActive && pinchRingPts) {
+          const t = clamp((performance.now() - pinchBurstStart) / PINCH_BURST_MS, 0, 1);
+          const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
+
+          const targetAttr = geometry.attributes.targetPos.array;
+          for (let i = 0; i < PARTICLE_COUNT; i++) {
+            const i3 = i * 3;
+            const pt = pinchRingPts[i % pinchRingPts.length];
+
+            const sx = pinchSeedX + (Math.sin(i * 12.9898) * 0.18);
+            const sy = pinchSeedY + (Math.cos(i * 78.233) * 0.18);
+
+            targetAttr[i3]     = sx + (pt.x - sx) * e;
+            targetAttr[i3 + 1] = sy + (pt.y - sy) * e;
+            targetAttr[i3 + 2] = zJitter[i] * 0.9;
+          }
+          geometry.attributes.targetPos.needsUpdate = true;
+
+          if (t >= 1) {
+            pinchBurstActive = false;
+            setTarget(pinchRingPts);
+          }
+        }
+      } else {
+        applyHandZoom();
+        camera.position.z += (targetCamZ - camera.position.z) * 0.04;
+      }
+
       if (!handPresent) {
         targetRotY += 0.0018;
         targetRotX = Math.sin(time * 0.4) * 0.1;
@@ -485,19 +639,6 @@
         const x = 16 * Math.pow(Math.sin(t), 3);
         const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
         arr[i*3] = x * 1.1; arr[i*3+1] = y * 1.1; arr[i*3+2] = (Math.random()-0.5)*5;
-      }
-      return arr;
-    }
-
-    // ✅ Pinch “particle container” ring around the GIF
-    function getPortalRingPoints(radius = 13.5, thickness = 2.2) {
-      const arr = new Float32Array(PARTICLE_COUNT * 3);
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const r = radius + (Math.random() - 0.5) * thickness;
-        arr[i*3]   = Math.cos(a) * r;
-        arr[i*3+1] = Math.sin(a) * r;
-        arr[i*3+2] = zJitter[i] * 0.8;
       }
       return arr;
     }
@@ -558,16 +699,55 @@
     }
 
     function updateProximityFromHand(marks) {
-      // palm width proxy (bigger = closer)
       const palm = Math.hypot(marks[5].x - marks[17].x, marks[5].y - marks[17].y);
       const raw = clamp((palm - PALM_MIN) / (PALM_MAX - PALM_MIN), 0, 1);
       prox01 += (raw - prox01) * PROX_SMOOTH;
     }
 
+    // Pinch effect: "one particle blooms" into a centered particle container
+    function runPinchBurst() {
+      const pos = geometry.attributes.position.array;
+      const idx = Math.floor(Math.random() * PARTICLE_COUNT);
+      pinchSeedX = pos[idx*3];
+      pinchSeedY = pos[idx*3+1];
+
+      const pts = [];
+      const ringCount = 2600;
+      const radius = 14.2;
+      const thick = 2.4;
+
+      for (let i = 0; i < ringCount; i++) {
+        const a = (i / ringCount) * Math.PI * 2;
+        const r = radius + (Math.random() - 0.5) * thick;
+        pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+      }
+
+      pinchRingPts = pts;
+
+      const seedPts = [];
+      for (let i = 0; i < 1800; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = Math.random() * 0.28;
+        seedPts.push({ x: pinchSeedX + Math.cos(a) * r, y: pinchSeedY + Math.sin(a) * r });
+      }
+      setTarget(seedPts);
+
+      pinchBurstActive = true;
+      pinchBurstStart = performance.now();
+    }
+
     async function startAI() {
       const video = document.createElement('video');
+      video.setAttribute('playsinline', 'true');
+      video.muted = true;
+
       const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-      hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.8 });
+
+      hands.setOptions({
+        maxNumHands: 1,                       // reduce confusion (gesture clarity)
+        modelComplexity: IS_MOBILE ? 0 : 1,   // mobile perf
+        minDetectionConfidence: 0.8
+      });
 
       hands.onResults(results => {
         const barCont = document.getElementById('charge-bar-container');
@@ -583,63 +763,91 @@
 
           updateProximityFromHand(marks);
 
-          // rotation from wrist
           targetRotY = clamp(-(marks[0].x - 0.5) * ROT_SENS, -ROT_CLAMP, ROT_CLAMP);
           targetRotX = clamp((marks[0].y - 0.5) * ROT_SENS, -ROT_CLAMP, ROT_CLAMP);
 
+          // finger up checks (simple + stable)
           const indexUp  = marks[8].y  < marks[6].y;
           const middleUp = marks[12].y < marks[10].y;
           const ringUp   = marks[16].y < marks[14].y;
+          const pinkyUp  = marks[20].y < marks[18].y;
 
+          // pinch
           const pinch = Math.hypot(marks[4].x - marks[8].x, marks[4].y - marks[8].y) < 0.035;
 
-          const doubleHeart =
-            results.multiHandLandmarks.length === 2 &&
-            Math.hypot(
-              results.multiHandLandmarks[0][4].x - results.multiHandLandmarks[1][4].x,
-              results.multiHandLandmarks[0][4].y - results.multiHandLandmarks[1][4].y
-            ) < 0.08;
+          // NEW mapping:
+          // pinch -> picture
+          // peace -> valentine
+          // open palm -> heart
+          // close palm -> iloveyou
+          // middle finger -> bitch
+          const peace = indexUp && middleUp && !ringUp && !pinkyUp;
+          const openPalm = indexUp && middleUp && ringUp && pinkyUp;
+          const closePalm = !indexUp && !middleUp && !ringUp && !pinkyUp;
+          const middleFinger = middleUp && !indexUp && !ringUp && !pinkyUp;
 
           if (pinch) current = "pinch";
-          else if (doubleHeart) current = "v-date";
-          else if (middleUp && !indexUp && !ringUp) current = "bitch";
-          else if (indexUp && middleUp && !ringUp) current = "love";
-          else if (!indexUp && !middleUp && !ringUp) current = "pretty";
-          else current = "detect";
+          else if (middleFinger) current = "bitch";
+          else if (peace) current = "valentine";
+          else if (openPalm) current = "heart";
+          else if (closePalm) current = "iloveyou";
+          else current = "none";
         } else {
-          // if no hands, ease prox back to mid so zoom doesn't jump
           prox01 += (0.5 - prox01) * 0.06;
         }
 
-        // ✅ Pinch: smooth portal + GIF reveal (no “MAGIC” text)
+        // Pinch: IMAGE + PARTICLE CONTAINER ONLY (NO ZOOM EVER)
         if (current === "pinch") {
           if (!pinchActive) {
             pinchActive = true;
             beforePinchMode = mode;
 
-            const pick = PINCH_GIFS[Math.floor(Math.random() * PINCH_GIFS.length)];
-            gif.src = pick;
+            // lock camera z instantly
+            pinchLockZ = camera?.position?.z ?? targetCamZ;
 
-            setMode("pinch");
-            setTarget(getPortalRingPoints());
-            showGif(true);
+            allowProxZoom = false;
 
-            // keep hint subtle
+            // clean UI while pinch is active
+            toast.classList.remove('show');
+            barCont.style.display = 'none';
+            bar.style.width = '0%';
+
+            // particle container morph
+            runPinchBurst();
+
+            // image load with fallback (no broken bar)
+            hideGif();
+            const myToken = ++pinchGifToken;
+
+            loadGifWithFallback(PINCH_GIFS, 4)
+              .then((loadedSrc) => {
+                if (!pinchActive || myToken !== pinchGifToken) return;
+                gif.src = loadedSrc;
+                gif.style.display = 'block';
+                requestAnimationFrame(() => gif.classList.add('show'));
+              })
+              .catch(() => {
+                if (!pinchActive || myToken !== pinchGifToken) return;
+                hideGif();
+              });
+
             gestureHint.innerText = " ";
           }
           return;
         } else if (pinchActive) {
-          // pinch ended
           pinchActive = false;
-          showGif(false);
+          allowProxZoom = true;
+          pinchGifToken++;
+          hideGif();
 
-          // restore to previous mode gracefully
+          pinchRingPts = null;
+          pinchBurstActive = false;
+
           setMode(beforePinchMode || "idle");
           gestureHint.innerText = "Waiting for Hands";
-          // do not force-setTarget here, stability engine will handle next gesture
         }
 
-        // --- Stability Engine ---
+        // Stability engine for non-pinch gestures
         if (current === lastGesture && current !== "none") {
           const progress = Math.min(((Date.now() - gestureStartTime) / STABILITY_MS) * 100, 100);
 
@@ -649,7 +857,6 @@
             gestureHint.innerText = "HOLDING...";
           } else {
             barCont.style.display = 'none';
-
             if (lastExecutedGesture !== current) {
               execute(current);
               lastExecutedGesture = current;
@@ -662,50 +869,49 @@
           barCont.style.display = 'none';
 
           if (current === "none") {
-            setMode("idle");
-            targetMorph = 0.0;
-            gestureHint.innerText = "Universe Idle";
+            // hands present but no mapped gesture
+            if (hasHands) gestureHint.innerText = "Waiting for Gesture";
+            else {
+              setMode("idle");
+              targetMorph = 0.0;
+              gestureHint.innerText = "Universe Idle";
+            }
           }
         }
       });
 
       const cam = new Camera(video, {
         onFrame: async () => { await hands.send({ image: video }); },
-        width: 640, height: 480
+        width: IS_MOBILE ? 480 : 640,
+        height: IS_MOBILE ? 360 : 480
       });
       cam.start();
     }
 
     function execute(g) {
-      if (g === "v-date") {
+      if (g === "valentine") {        // peace
         setMode("text");
         gestureHint.innerText = " ";
         showCenterToast("❤️ VALENTINE? ❤️", 900);
         setTarget(getTextPoints("CAN U BE MY VALENTINE DATE?"));
       }
-      else if (g === "bitch") {
-        setMode("text");
+      else if (g === "heart") {       // open palm
+        setMode("heart");
         gestureHint.innerText = " ";
-        showCenterToast("BITCH", 900);
-        setTarget(getTextPoints("BITCH"));
+        showCenterToast("Forming Heart...", 700);
+        setTarget(getHeartPoints());
       }
-      else if (g === "love") {
+      else if (g === "iloveyou") {    // close palm
         setMode("text");
         gestureHint.innerText = " ";
         showCenterToast("I LOVE YOUUU", 900);
         setTarget(getTextPoints("I LOVE YOUUU"));
       }
-      else if (g === "pretty") {
+      else if (g === "bitch") {       // middle finger
         setMode("text");
         gestureHint.innerText = " ";
-        showCenterToast("YOU'RE PRETTY", 900);
-        setTarget(getTextPoints("YOU'RE PRETTY"));
-      }
-      else if (g === "detect") {
-        setMode("heart");
-        gestureHint.innerText = " ";
-        showCenterToast("Forming Heart...", 700);
-        setTarget(getHeartPoints());
+        showCenterToast("BITCH", 900);
+        setTarget(getTextPoints("BITCH"));
       }
     }
 
@@ -714,8 +920,10 @@
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    });
+
+      const pr = IS_MOBILE ? 1.25 : 2;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pr));
+    }, { passive: true });
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
